@@ -22,13 +22,13 @@ After deployment, verify that all vSensors are listed in the *Probes* section of
 
 === Network security
 
-This deployment follows AWS security best practices for network security. The vSensor instances are deployed in private subnets. They are only accessible from the internet using SSH to connect to bastion hosts in the private subnets. For existing VPC deployments, it is important that security groups only allow SSH access from trusted sources. It is not recommended to allow direct SSH access to vSensors from the internet. For more information, see https://aws.amazon.com/architecture/security-identity-compliance/?cards-all.sort-by=item.additionalFields.sortDate&cards-all.sort-order=desc&awsf.content-type=*all&awsf.methodology=*all[Best Practices for Security, Identity, & Compliance^].
+This deployment follows AWS security best practices for network security. The vSensor instances are deployed in private subnets. They are only accessible from the internet using SSH to connect via jump boxes in the private subnets. For existing VPC deployments, it is important that security groups only allow SSH access from trusted sources. It is not recommended to allow direct SSH access to vSensors from the internet. For more information, see https://aws.amazon.com/architecture/security-identity-compliance/?cards-all.sort-by=item.additionalFields.sortDate&cards-all.sort-order=desc&awsf.content-type=*all&awsf.methodology=*all[Best Practices for Security, Identity, & Compliance^].
 
 === OS security
 
-To gain root access to vSensor instances, use the `ubuntu` user name and the EC2 key pair link:#_parameter_reference[parameter] you entered during deployment as the private key path. Then sudo to root. The EC2 key pair is also required to access `ec2-user` of the bastion hosts. For more information, see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AccessingInstancesLinux.html[Connect to your Linux instance using SSH^].
+The recommended way to get access is to use AWS Systems Manager Session Manager, but to gain root access via SSH to vSensor instances, use the `ubuntu` user name and the EC2 key pair link:#_parameter_reference[parameter] you entered during deployment as the private key path. Then sudo to root. For more information, see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AccessingInstancesLinux.html[Connect to your Linux instance using SSH^].
 
-The bastion hosts deployed by this Quick Start are set to update automatically. The deployed vSensors are configured to receive the latest security and product updates daily from Darktrace and Ubuntu package repositories.
+The deployed vSensors are configured to receive the latest security and product updates daily from Darktrace and Ubuntu package repositories.
 
 === Using AWS Sessions Manager
 

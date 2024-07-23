@@ -137,7 +137,7 @@ Parameters:
 
   SessionManagerEnable:
     Default: 'Yes'
-    Description: Configure IAM permissions to enable AWS Systems Manager Sessions to access vSensors remotely. See QuickStart Deployment guide section "Using AWS Sessions Manager" (https://aws-ia.github.io/cfn-ps-darktrace-vsensor/#_using_aws_sessions_manager). This can be used in preference to the Bastion hosts for administrative connections to the vSensors.
+    Description: Configure IAM permissions to enable AWS Systems Manager Sessions to access vSensors remotely. See QuickStart Deployment guide section "Using AWS Sessions Manager" (https://aws-ia.github.io/cfn-ps-darktrace-vsensor/#_using_aws_sessions_manager). This can be used in preference to a jump box for administrative connections to the vSensors. AWS Systems Manager Sessions is the recommended way to connect to your vSensors.
     Type: String
     AllowedValues:
       - 'Yes'
@@ -152,11 +152,12 @@ Parameters:
       - m5.2xlarge
       - m5.4xlarge
   KeyPairName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: Add a pre-existing EC2 key pair to use to authenticate to the vSensors. vSensors are designed to be self managed - however some optional administrative tasks will need to be performed via CLI.
+    Type: String
+    Description: Add a pre-existing EC2 key pair to use to authenticate to the vSensors. vSensors are designed to be self managed - however some optional administrative tasks will need to be performed via CLI. Use 'none' to proceed without a key pair (only if you are using SSM or Instance Connect, otherwise you will not be able to access your vSensor).
   InstanceSecurityGroups:
     Type: 'CommaDelimitedList'
     Description: "*Optional* Add additional Security Groups to the VPC by specifying preexisting Security Group IDs. Note, this is in addition to the required vSensor connectivity Security Group (port 80, 443, 4789 for the VPC) which will be added by this QuickStart template. (CommaDelimitedList)"
+    Default: ""
   VsensorUpdatekey:
     Type: AWS::SSM::Parameter::Name
     Description: "The vSensor Update Key is required to download installation packages and updates from Darktrace. It is provided when you create a *push token* probe entry in the Darktrace UI Config or can be found on the Credentials section on the Darktrace Customer Portal (https://customerportal.darktrace.com) (AWS::SSM::Parameter::Name)"
@@ -188,7 +189,7 @@ Parameters:
   SshCIDRBlock:
     Type: String
     Default: '10.0.0.0/24'
-    Description: Permit SSH connections from this CIDR block. The vSensor Security Group will be altered accordingly. It is recommended to set any Bastion host addresses here, or set to the VPC CIDR.
+    Description: Permit SSH connections from this CIDR block. The vSensor Security Group will be altered accordingly. It is recommended to set any jump box addresses here, or set to the VPC CIDR.
   Subnets:
     Type: 'List<AWS::EC2::Subnet::Id>'
     Description: >-
@@ -278,6 +279,9 @@ Conditions:
   AllowCrossZoneLB: !Equals
     - !Ref CrossZoneLBEnable
     - "Yes"
+  NoKeyPair: !Equals
+    - !Ref KeyPairName
+    - "none"
 Rules:
   SubnetsInVPC:
     Assertions:
@@ -307,12 +311,12 @@ Resources:
 
   RandomStringLambdaFunction:
     Type: AWS::Lambda::Function
-    # Ignore nodejs18 not defined yet in QuickStart cfn-lint CI version
+    Condition: GenerateShortID
     Metadata:
       cfn-lint:
         config:
-          ignore_checks: [E3030]
-    Condition: GenerateShortID
+          ignore_checks:
+            - E3030 # Valid value for Runtime (nodejs20.x)
     Properties:
       Code:
         ZipFile: >
@@ -339,7 +343,7 @@ Resources:
             response.send(event, context, response.SUCCESS, responseData);
           };
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Role: !GetAtt LambdaExecutionRole.Arn
       MemorySize: 128
       Timeout: 20
@@ -664,7 +668,10 @@ Resources:
                 - CreatePCAPStorage
                 - !Ref PCAPS
                 - ""
-        KeyName: !Ref KeyPairName
+        KeyName: !If
+          - NoKeyPair
+          - !Ref AWS::NoValue
+          - !Ref KeyPairName
         InstanceType: !Ref InstanceType
         BlockDeviceMappings:
           - DeviceName: "/dev/sda1"
@@ -691,6 +698,9 @@ Resources:
                 Value: 'YES'
         Monitoring:
           Enabled: true
+        MetadataOptions:
+          HttpEndpoint: 'enabled'
+          HttpTokens: 'required'
       LaunchTemplateName:
         !Sub
           - "${ShortID}-vSensor-Launch-Template"
@@ -1032,6 +1042,11 @@ Resources:
     DependsOn: PCAPS
     Type: "AWS::Lambda::Function"
     Condition: CreatePCAPStorage
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - E3030 # Valid value for Runtime (python3.12)
     Properties:
       Code:
         ZipFile: |
@@ -1138,7 +1153,7 @@ Resources:
           - !Ref ShortID
       Handler: index.lambda_handler
       Role: !GetAtt CleanupBucketOnDeleteLambdaRole.Arn
-      Runtime: python3.8
+      Runtime: python3.12
       Timeout: 60
       Tags:
         - Key: darktrace-vsensor-quickstart

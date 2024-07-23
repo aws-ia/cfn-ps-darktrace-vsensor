@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: This template creates a virtual private cloud (VPC) infrastructure for a multi-Availability Zone vSensor deployment on the Amazon Web Services (AWS) Cloud. It deploys a VPC, bastion hosts, and scalable cluster of Darktrace vSensors behind a Network Load Balancer. **WARNING** You will be billed for AWS resources you use if you create a stack from this template. (qs-1ths1l3in)
+Description: This template creates a virtual private cloud (VPC) infrastructure for a multi-Availability Zone vSensor deployment on the Amazon Web Services (AWS) Cloud. It deploys a VPC and scalable cluster of Darktrace vSensors behind a Network Load Balancer. **WARNING** You will be billed for AWS resources you use if you create a stack from this template. (qs-1ths1l3in)
 Transform: 'AWS::LanguageExtensions'
 Metadata:
 
@@ -29,14 +29,6 @@ Metadata:
         - PublicSubnet4CIDR
         - PublicSubnet5CIDR
         - PublicSubnet6CIDR
-    - Label:
-        default: Bastion configuration
-      Parameters:
-        - BastionEnable
-        - BastionInstanceType
-        - BastionKeyPairName
-        - BastionAMIOS
-        - RemoteAccessCIDR
     - Label:
         default: Darktrace Instance configuration
       Parameters:
@@ -104,19 +96,6 @@ Metadata:
         default: Public subnet 5 CIDR
       PublicSubnet6CIDR:
         default: Public subnet 6 CIDR
-
-      # Bastion Config
-
-      BastionEnable:
-        default: Deploy with Bastion host?
-      BastionInstanceType:
-        default: Bastion host instance type
-      BastionKeyPairName:
-        default: Key pair name
-      BastionAMIOS:
-        default: Bastion host AMI operating system
-      RemoteAccessCIDR:
-        default: Bastion host remote access CIDR
 
       # Darktrace Instance Config
 
@@ -192,7 +171,7 @@ Parameters:
 
   SessionManagerEnable:
     Default: 'Yes'
-    Description: Configure IAM permissions to enable AWS Systems Manager Sessions to access vSensors remotely. See QuickStart Deployment guide section "Using AWS Sessions Manager" (https://aws-ia.github.io/cfn-ps-darktrace-vsensor/#_using_aws_sessions_manager). This can be used in preference to the Bastion hosts for administrative connections to the vSensors.
+    Description: Configure IAM permissions to enable AWS Systems Manager Sessions to access vSensors remotely. See QuickStart Deployment guide section "Using AWS Sessions Manager" (https://aws-ia.github.io/cfn-ps-darktrace-vsensor/#_using_aws_sessions_manager). This can be used in preference to a jump box for administrative connections to the vSensors. AWS Systems Manager Sessions is the recommended way to connect to your vSensors.
     Type: String
     AllowedValues:
       - 'Yes'
@@ -207,8 +186,8 @@ Parameters:
       - m5.2xlarge
       - m5.4xlarge
   VSensorKeyPairName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: Add a pre-existing EC2 key pair to use to authenticate to the vSensors. vSensors are designed to be self managed - however some optional administrative tasks will need to be performed via CLI.
+    Type: String
+    Description: Add a pre-existing EC2 key pair to use to authenticate to the vSensors. vSensors are designed to be self managed - however some optional administrative tasks will need to be performed via CLI. Use 'none' to proceed without a key pair (only if you are using SSM or Instance Connect, otherwise you will not be able to access your vSensor).
   VSensorUpdatekey:
     Type: AWS::SSM::Parameter::Name
     Description: "The vSensor Update Key is required to download installation packages and updates from Darktrace. It is provided when you create a *push token* probe entry in the Darktrace UI Config or can be found on the Credentials section on the Darktrace Customer Portal (https://customerportal.darktrace.com) (AWS::SSM::Parameter::Name)"
@@ -310,48 +289,6 @@ Parameters:
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28.
     Default: 10.0.208.0/20
     Description: CIDR block for the public (DMZ) subnet 6, located in Availability Zone 6. Leave default if less Availability Zones are required.
-    Type: String
-  
-  # Bastion Config
-
-  BastionEnable:
-    Default: 'No'
-    Description: Use the AWS Quickstart Bastion template to deploy a public Bastion host to access your vSensor deployment. If 'No' is selected, you may still access via an AWS Systems Manager Session, or configure your ssh access manually after deployment. 2+ AZs must be provided.
-    Type: String
-    AllowedValues:
-      - 'Yes'
-      - 'No'
-  BastionInstanceType:
-    # Limit to Nitro instances, compatible with Traffic Mirroring.
-    AllowedValues:
-      - t3.micro
-      - t3.small
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - t3.2xlarge
-    Default: t3.micro
-    Description: Amazon EC2 instance type for the bastion hosts.
-    Type: String
-  BastionKeyPairName:
-    Description: Name of an existing public/private key pair, which allows you to securely connect to your instance after it launches. Set the same as the vSensor if Bastion is not enabled.
-    Type: AWS::EC2::KeyPair::KeyName
-  BastionAMIOS:
-    AllowedValues:
-      - Amazon-Linux2-HVM
-      - Amazon-Linux2-HVM-ARM
-      - Amazon-Linux2022
-      - Amazon-Linux2022-ARM
-      - Ubuntu-Server-20.04-LTS-HVM
-      - Ubuntu-Server-22.04-LTS-HVM
-      - Ubuntu-Server-22.04-LTS-HVM-ARM
-    Default: Amazon-Linux2-HVM
-    Description: Linux distribution for the Amazon Machine Image (AMI) used for the bastion host instances (if deployed).
-    Type: String
-  RemoteAccessCIDR:
-    AllowedPattern: ^((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))|)$
-    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/x or left blank.
-    Description: CIDR IP range that is permitted to access the bastion hosts (if deployed). We recommend that you set this value to a trusted IP range, or leave blank if Bastion is not enabled.
     Type: String
 
   # Traffic Mirroring Config
@@ -461,11 +398,6 @@ Conditions:
   UsingDefaultBucket: !Equals
     - !Ref QSS3BucketName
     - "aws-ia"
-  CreateBastion: !And
-    - !Equals 
-      - !Ref BastionEnable
-      - "Yes"
-    - !Condition 2AZCondition
   CreatePCAPStorage: !Not
     - !Equals
       - !Ref VSensorLifecycleS3BucketDays
@@ -490,19 +422,6 @@ Conditions:
     - !Condition '6AZCondition'
   6AZCondition: !Equals [Fn::Length: !Ref 'AvailabilityZones', 6]
 
-Rules:
-  EmptyRemoteAccessCIDR:
-    RuleCondition:
-      !Equals
-        - !Ref RemoteAccessCIDR
-        - ""
-    Assertions:
-      - Assert:
-          !Equals
-            - !Ref BastionEnable
-            - "No"
-        AssertDescription: Remote Access CIDR must be provided if Bastion deployment is enabled.
-
 Resources:
 
   ## Generate a short ID if the user does not define one.
@@ -525,12 +444,12 @@ Resources:
 
   RandomStringLambdaFunction:
     Type: AWS::Lambda::Function
-    # Ignore nodejs18 not defined yet in QuickStart cfn-lint CI version
+    Condition: GenerateShortID
     Metadata:
       cfn-lint:
         config:
-          ignore_checks: [E3030]
-    Condition: GenerateShortID
+          ignore_checks:
+            - E3030 # Valid value for Runtime (nodejs20.x)
     Properties:
       Code:
         ZipFile: >
@@ -557,7 +476,7 @@ Resources:
             response.send(event, context, response.SUCCESS, responseData);
           };
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Role: !GetAtt LambdaExecutionRole.Arn
       MemorySize: 128
       Timeout: 20
@@ -662,64 +581,6 @@ Resources:
                 - !GetAtt ShortIDRand.IDString
                 - !Ref ShortID
 
-  BastionStack:
-
-    Type: AWS::CloudFormation::Stack
-    Condition: CreateBastion
-    DeletionPolicy: Delete
-    # Ignore Notification ARN in customer env.
-    # kics-scan ignore-line
-    Properties:
-      TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}submodules/cfn-ps-linux-bastion/templates/linux-bastion-entrypoint-existing-vpc.template.yaml'
-          - S3Bucket: !If
-              - UsingDefaultBucket
-              - !Sub "aws-ia-${AWS::Region}"
-              - !Ref "QSS3BucketName"
-            S3Region: !If
-              - UsingDefaultBucket
-              - !Ref "AWS::Region"
-              - !Ref "QSS3BucketRegion"
-      Parameters:
-        BastionHostName:
-          !Sub
-            - "${ShortID}-vSensor-Bastion"
-            - ShortID: !If
-              - GenerateShortID
-              - !GetAtt ShortIDRand.IDString
-              - !Ref ShortID
-        BastionAMIOS:
-          Ref: BastionAMIOS
-        BastionInstanceType:
-          Ref: BastionInstanceType
-        EnableTCPForwarding: true
-        KeyPairName:
-          Ref: BastionKeyPairName
-        PublicSubnet1ID:
-          !GetAtt
-            - VPCStack
-            - Outputs.PublicSubnet1ID
-        PublicSubnet2ID:
-          !GetAtt
-            - VPCStack
-            - Outputs.PublicSubnet2ID
-        RemoteAccessCIDR:
-          Ref: RemoteAccessCIDR
-        VPCID:
-          !GetAtt
-            - VPCStack
-            - Outputs.VPCID
-      Tags:
-        - Key: "Name"
-          Value:
-            !Sub
-              - "${ShortID}-vSensor-Bastion-Stack"
-              - ShortID: !If
-                - GenerateShortID
-                - !GetAtt ShortIDRand.IDString
-                - !Ref ShortID
-
   VSensorStack:
     
     Type: AWS::CloudFormation::Stack
@@ -785,14 +646,6 @@ Resources:
             - VPCStack
             - Outputs.VPCID
         InstanceType: !Ref VSensorInstanceType
-        # If customer uses bastion, allow bastion NSG access to vSensors.
-        InstanceSecurityGroups:
-          Fn::If:
-            - CreateBastion
-            - Fn::GetAtt:
-              - BastionStack
-              - Outputs.BastionSecurityGroupID
-            - ""
         LifecycleS3BucketDays: !Ref VSensorLifecycleS3BucketDays
         DesiredCapacityASG: !Ref VSensorDesiredCapacityASG
         MinSizeASG: !Ref VSensorMinSizeASG

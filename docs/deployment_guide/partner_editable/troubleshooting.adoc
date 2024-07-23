@@ -18,3 +18,7 @@ For situations where the error is not clear, contact Darktrace Customer Support 
 
 // == Resources
 // Uncomment section and add links to any external resources that are specified by the partner.
+
+== Operational Notes
+
+NOTE: Previous versions of this template supported deploying AWS Linux Bastion hosts, this has been removed due to compatibilty reasons. AWS Systems Manager Session Manager is now the recommended way to access the private subnets of the vSensor.

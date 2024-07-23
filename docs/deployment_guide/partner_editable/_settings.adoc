@@ -3,13 +3,13 @@
 :partner-product-name: Darktrace vSensor
 :partner-product-short-name: Darktrace vSensor
 :partner-company-name: Darktrace
-:doc-month: November
-:doc-year: 2023
+:doc-month: March
+:doc-year: 2024
 :partner-contributors: Development Team Documentations at {partner-company-name}
 // :other-contributors: Akua Mansa, Trek10
 // :aws-contributors: Janine Singh, AWS IoT Partner team
 :aws-ia-contributors: Tony Bulding, AWS Integration & Automation team
-:deployment_time: 30 minutes / 1 hour
+:deployment_time: 30 minutes
 :default_deployment_region: us-east-1
 // :private_repo:
 
